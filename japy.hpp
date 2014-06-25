@@ -40,6 +40,47 @@ SOFTWARE.
 #include <string>
 #include <vector>
 
+/* 
+   Japy's public interface consists of these:
+   - path expressions that are plain strings (see README)
+   - japy::parse method that you should use to parse a complete json document.
+     - returns node_set_t
+   - japy::node_set_t that represents a collection of nodes selected by a path.
+     - use as a container to iterate over matching nodes
+     - use >> to extract nodes one by one
+   - japy::node_t that represents a single node
+     - use >> to convert node value into c++ type
+     - use [] and a sub-path to perform sub-queries (returns node_set_t)
+   - japy::parser_t that you should use to parse streams of json data.
+     - supply it with a 'scope-path' that is used to buffer matched nodes
+     - use 'put()' to feed a block of data
+     - use parser as a container to iterate over nodes that match the 
+       scope-path within current block
+     - goto -2;
+
+   Japy tries to minimize copying of input data, which means that data blocks
+   you feed into it must live as long as they are fully parsed.
+
+   See examples.cpp on how to use japy.
+
+   Japy's internals are organized this way:
+   - japy::detail::parser_t is a callback-based parser (SAX-style parser 
+     if you are XML guy), it is supplied with a visitor that receives all the
+     'events' (start/end of input/object/array/name/value). Parser has internal
+     buffer to store names and values that are at the borders of data blocks.
+   - japy::detail::selector_t is a single selector of a path
+   - japy::detail::path_t is a collection of selectors
+   - japy::detail::matcher_t is a visitor who receives events of 
+     detail::parser_t and matches the json against the path_t, and 
+     calls a receiver when something is matched
+   - japy::node_set_t and japy::parser_t both encapsulate detail::parser_t, 
+     detail::path_t, detail::matcher_t and an internal receiver for matched 
+     data. japy::parser_t differs from japy::node_set_t in that it must 
+     buffer the matched nodes if they are fed in parts. japy::node_set_t 
+     does not need a buffer as it only parses complete (sub-)trees of json.
+
+ */
+
 namespace japy
 {
 
