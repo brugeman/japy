@@ -82,7 +82,7 @@ test1 ()
    {}
 
    // how about an even more complex document?
-   // '/#/$/a' refers to "root array's child objects' members named a"
+   // '#/$/a' refers to "root array's child objects' members named a"
    japy::parse ("[{\"a\":6}]", "#/$/a") >> i;
    assert (i == 6);
 
@@ -195,7 +195,7 @@ test3 ()
 
    // create a parser, specify a 'scope-path'
    // objects referred by scope-path are buffered internally 
-   // (if seen of the parts' borders)
+   // (if seen on the parts' borders)
    japy::parser_t parser ("/*");
 
    // feed a part of your json into parser
