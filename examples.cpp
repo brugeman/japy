@@ -94,7 +94,7 @@ test1 ()
    assert (i == 7);
 
    // ok, one more thing
-   // '/#a/*' refers to 'elements of child array members named a'
+   // '/#a/*' refers to 'elements of child array named a'
    japy::parse ("{\"a\":[8, 88]}", "/#a/*") >> i;
    // note that both 8 and 88 are a match, but >> extracts only the first one
    assert (i == 8);
@@ -155,7 +155,8 @@ test2 ()
    }
    assert (sum == 1);
 
-   // to avoid exceptions on partially matching branches, use ?
+   // to avoid exceptions on partially matching branches, 
+   // use ? on selector that may observe mismatch
    sum = 0;
    for (auto a_member: japy::parse ("[{\"a\":1}, [{\"b\":2}]]", "//$/?a"))
    {
