@@ -89,6 +89,10 @@ struct string_t
       : data (data), size (strlen (data)) 
    {}
 
+   string_t (const char & ch)
+      : data (&ch), size (1) 
+   {}
+
    template<class Buffer>
    string_t (const Buffer & b)
       : data (b.data ())
@@ -2056,8 +2060,12 @@ parser_t::receiver_t::receive_input_end (const char * end)
    }
    else
    {
+      // means that match has just finished, but was not yet
+      // read by the client
+      if (body.size)
+	 return;
+
       from = body.data;
-      assert (!body.size);
    }
 
    assert (end >= from);
@@ -2088,7 +2096,7 @@ parser_t::receiver_t::receive_match_start (
 inline void 
 parser_t::receiver_t::receive_match_end (const char * end)
 {
-   assert (end && *end);
+   assert (end);
 
    assert (body.data);
    assert (node_type != node_type_any);
