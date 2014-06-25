@@ -94,9 +94,9 @@ enum node_type_t
    node_type_any,
    node_type_array,
    node_type_object,
-   node_type_attribute,
+   node_type_value,
    node_type_string,
-   node_type_decimal,
+   node_type_integral,
    node_type_float,
    node_type_boolean,
    node_type_null
@@ -506,11 +506,11 @@ namespace detail
 	 {"array", node_type_array},
 	 {"object", node_type_object},
 	 {"string", node_type_string},
-	 {"decimal", node_type_decimal},
+	 {"integral", node_type_integral},
 	 {"float", node_type_float},
 	 {"boolean", node_type_boolean},
 	 {"null", node_type_null},
-	 {"attribute", node_type_attribute},
+	 {"value", node_type_value},
 	 {"any", node_type_any},
 	 {0, node_type_any} // zero-terminator
       };
@@ -604,7 +604,7 @@ namespace detail
 	 case '*': node_type = node_type_any;
 	    break;
 
-	 case '@': node_type = node_type_attribute;
+	 case '@': node_type = node_type_value;
 	    break;
 
 	 case '#': node_type = node_type_array;
@@ -619,7 +619,7 @@ namespace detail
 
 	    switch (type)
 	    {
-	       case 'd': node_type = node_type_decimal;
+	       case 'i': node_type = node_type_integral;
 		  break;
 
 	       case 'f': node_type = node_type_float;
@@ -1065,7 +1065,7 @@ namespace detail
       const selector_t & s = selector ();
 
       // FIXME these are ugly!
-      auto is_decimal = [] (const string_t & s)
+      auto is_integral = [] (const string_t & s)
 	 {
 	    // FIXME find a better way
 	    try
@@ -1115,8 +1115,8 @@ namespace detail
 	       return node_type_null;
 	    else if (is_boolean (value))
 	       return node_type_boolean;
-	    else if (is_decimal (value))
-	       return node_type_decimal;
+	    else if (is_integral (value))
+	       return node_type_integral;
 	    else if (is_float (value))
 	       return node_type_float;
 	    else
@@ -1124,15 +1124,15 @@ namespace detail
 	 };
 
       // so what's the type?
-      node_type_t value_node_type = node_type_attribute;
+      node_type_t value_node_type = node_type_value;
       if (quoted || value.empty ())
 	 value_node_type = node_type_string;
       else
 	 value_node_type = guess_node_type (value);
-      assert (value_node_type != node_type_attribute);
+      assert (value_node_type != node_type_value);
 
       // type matches?
-      bool type_match = s.node_type == node_type_attribute;
+      bool type_match = s.node_type == node_type_value;
       type_match |= s.node_type == node_type_any;
       type_match |= s.node_type == value_node_type;
 
@@ -1157,7 +1157,7 @@ namespace detail
 
 	    return true;
 	 }
-	 // else FIXME makes no sense for a child selector on attribute
+	 // else FIXME makes no sense for a child selector on value
       }
 
 #ifdef JAPY_DEBUG
@@ -1962,7 +1962,7 @@ node_set_t::receiver_t::receive_match_start (
    assert (!body.data);
    assert (start && *start);
    assert (node_type != node_type_any);
-   assert (node_type != node_type_attribute);
+   assert (node_type != node_type_value);
    body.data = start;
    this->node_type = node_type;
 }
@@ -1972,7 +1972,7 @@ node_set_t::receiver_t::receive_match_end (const char * end)
 {
    assert (body.data);
    assert (node_type != node_type_any);
-   assert (node_type != node_type_attribute);
+   assert (node_type != node_type_value);
    assert (end);
    assert (end >= body.data);
    body.size = end - body.data;
@@ -2054,7 +2054,7 @@ parser_t::receiver_t::receive_match_start (
 {
    assert (start && *start);
    assert (node_type != node_type_any);
-   assert (node_type != node_type_attribute);
+   assert (node_type != node_type_value);
 
    assert (!body.data);
    assert (!body.size);

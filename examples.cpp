@@ -87,10 +87,10 @@ test1 ()
    assert (i == 6);
 
    // what if we want to make sure the selected value is of decimal type?
-   // 'd:' in path means 'node type - decimal'
-   japy::parse ("{\"a\":7}", "/d:a") >> i;
+   // 'i:' in path means 'node type - integral'
+   japy::parse ("{\"a\":7}", "/i:a") >> i;
    assert (i == 7);   
-   japy::parse ("{\"a\":\"77\"}", "/?d:a") >> i;
+   japy::parse ("{\"a\":\"77\"}", "/?i:a") >> i;
    assert (i == 7);
 
    // ok, one more thing
@@ -137,12 +137,14 @@ test2 ()
    // same path as in previous example
    try
    {
-      for (auto a_member: japy::parse ("[{\"a\":1}, [{\"b\":2}]]", "//$/a"))
+      const char * json = "[{\"a\":1}, [{\"b\":2}], {\"a\":3}]";
+      for (auto a_member: japy::parse (json, "//$/a"))
       {
 	 int v = 0;
 	 a_member >> v;
 	 sum += v;
       }
+      assert (0);
    }
    catch (...)
    {
