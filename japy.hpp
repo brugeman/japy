@@ -40,35 +40,6 @@ SOFTWARE.
 #include <string>
 #include <vector>
 
-   // path: [selector] [/ selector]*
-   // second / means 'all descedants', not just children
-   // selector: [/] [!] [?] [type] [name] 
-   // ! means 
-   // type: # | array: | $ | object: | @ | attribute:
-   // ? means 'node-set may be empty'
-   // name: json_name | json_string
-   // json_name: (a-zA-Z_-)(a-zA-Z0-9_-)*
-   // json_string: "(anything)*"
-
-   // abbreviations of type:
-   // * - any
-   // # - array
-   // $ - object
-   // @ - attribute
-   // S - string
-   // D - decimal
-   // F - float
-   // B - boolean
-   // N - null
-
-
-      // a/?b/c:
-      // empty - exception, 'a' expected
-      // a or a/x - no exception, 'b' is optional, nothing matches
-      // a/b - exception, 'c' expected
-      // a/b/c - no exception, match
-
-
 namespace japy
 {
 
