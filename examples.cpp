@@ -86,7 +86,7 @@ test1 ()
    japy::parse ("[{\"a\":6}]", "#/$/a") >> i;
    assert (i == 6);
 
-   // what if we want to make sure the selected value is of decimal type?
+   // what if we want to make sure the selected value is of integral type?
    // 'i:' in path means 'node type - integral'
    japy::parse ("{\"a\":7}", "/i:a") >> i;
    assert (i == 7);   

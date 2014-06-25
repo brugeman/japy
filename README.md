@@ -39,7 +39,7 @@ Selectors may contain any or all of these, in this order:
     * <code>*</code> or <code>any:</code> - any type  
     * <code>#</code> or <code>#:</code> or <code>array:</code> - array  
     * <code>$</code> or <code>$:</code> or <code>object:</code> - object  
-    * <code>@</code> or <code>@:</code> or <code>value:</code> - anything except <code>#</code> or <code>$</code>  
+    * <code>@</code> or <code>@:</code> or <code>value:</code> - anything except <code>#</code> and <code>$</code>  
     * <code>i:</code> or <code>integral:</code> - integral values  
     * <code>f:</code> or <code>float:</code> - floating-point values  
     * <code>b:</code> or <code>boolean:</code> - boolean value (true or false)  
