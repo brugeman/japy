@@ -268,6 +268,24 @@ test3 ()
 
    }
 
+   {
+   // normally a json document must have a single root,
+   // and an exception is thrown in presence of 'trailing garbage'.
+   // however, sometimes you have streams of json documents, 
+   // each having a root. use 'allow_many_roots' option for that case:
+   int sum = 0;
+   japy::parser_t parser ("/a");
+   parser.allow_many_roots (true);
+   parser.put ("{\"a\":1} {\"a\":2}"); // two json docs in one stream
+   for (auto node: parser)
+   {
+      int v = 0;
+      node >> v;
+      sum += v;
+   }
+   assert (sum == 3);
+   }
+
    // I guess I'll add more stuff here when questions arise.
    printf ("test3 done\n");
 }

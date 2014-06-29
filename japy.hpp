@@ -411,6 +411,7 @@ namespace detail
    class parser_t
    {
       Visitor & visitor_;
+      bool allow_many_roots_;
 
       const char * input_; // input start
       const char * end_;   // input end
@@ -457,12 +458,16 @@ namespace detail
    
       parser_t (Visitor & visitor) 
 	 : visitor_ (visitor)
+	 , allow_many_roots_ (false)
 	 , input_ (0)
 	 , end_ (0)
 	 , escape_ (false)
 	 , end_of_step_ (false)
 	 , state_handler_ (&parser_t::process_root)
       {}
+
+      void allow_many_roots (const bool a) { allow_many_roots_ = a; }
+      bool allow_many_roots () const { return allow_many_roots_; }
 
       // feed more data to parse, data must live until !more().
       // preconditions: !more()
@@ -1262,7 +1267,11 @@ namespace detail
       state_handler_ = &parser_t::process_comma_expected;
       stack_.pop ();
       if (stack_.empty ())
-	 state_handler_ = &parser_t::process_root_end;
+      {
+	 state_handler_ = allow_many_roots_ 
+	    ? &parser_t::process_root
+	    : &parser_t::process_root_end;
+      }
 
       ++input_;
       skip_spaces ();
@@ -1282,7 +1291,11 @@ namespace detail
       state_handler_ = &parser_t::process_comma_expected;
       stack_.pop ();
       if (stack_.empty ())
-	 state_handler_ = &parser_t::process_root_end;
+      {
+	 state_handler_ = allow_many_roots_ 
+	    ? &parser_t::process_root
+	    : &parser_t::process_root_end;
+      }
 
       ++input_;
       skip_spaces ();
@@ -1931,6 +1944,9 @@ class parser_t
 public:
 
    parser_t (const char * path);
+
+   void allow_many_roots (const bool a) { parser_.allow_many_roots (a); }
+   bool allow_many_roots () const { return parser_.allow_many_roots (); }
 
    void put (const string_t & str);
 
