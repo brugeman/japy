@@ -156,7 +156,7 @@ test2 ()
 
    // or one by one extraction of nodes
    sum = 0;
-   auto node_set = japy::parse ("[{\"a\":1}, {\"a\":2}]", "#/$/a");
+   auto node_set (japy::parse ("[{\"a\":1}, {\"a\":2}]", "#/$/a"));
    int v1 = 0;
    int v2 = 0;
    node_set >> v1 
