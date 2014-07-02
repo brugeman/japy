@@ -35,8 +35,9 @@ SOFTWARE.
 #include <cassert>
 #include <cstring>
 
-#include <exception>
+#include <limits>
 #include <stack>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -594,6 +595,9 @@ namespace detail
       for (; t->name; ++t)
       {
 	 const size_t len = strlen (t->name);
+	 if (len != s.size)
+	    continue;
+
 	 if (strncmp (s.data, t->name, s.size))
 	    continue;
 
@@ -1267,7 +1271,7 @@ namespace detail
    inline void 
    parser_t<Visitor>::skip_spaces ()
    {
-      assert (input_);
+      assert (input_ <= end_);
       for (; input_ != end_ && is_space (*input_); ++input_);
    }
 
@@ -1451,12 +1455,12 @@ namespace detail
 
       auto quoted_end = [this] (const char c)
 	 {
-	    return c == '"' && !escape_; 
+	    return c == '"' && !this->escape_; 
 	 };
 
       auto update_escape = [this] (const char c)
 	 {
-	    escape_ = !escape_ && c == '\\';
+	    this->escape_ = !this->escape_ && c == '\\';
 	 };
 
       const char * from = input_;
@@ -1872,7 +1876,7 @@ public:
 
    node_input_iterator_t<Cont> operator++ (int) 
    {
-      input_iterator_t<Cont> tmp (*this); 
+      node_input_iterator_t<Cont> tmp (*this); 
       operator++ (); 
       return tmp;
    }
@@ -1887,7 +1891,7 @@ public:
       return !(*this == other);
    }
 
-   typename node_t operator* () const
+   node_t operator* () const
    {
       assert (stream_);
       return stream_->value ();
@@ -1913,7 +1917,7 @@ end (const Cont & input)
 
 class node_set_t
 {
-   struct receiver_t
+   mutable struct receiver_t
    {
       string_t body;
       node_type_t node_type;
@@ -1937,13 +1941,13 @@ class node_set_t
    typedef detail::matcher_t<receiver_t> matcher_t;
    matcher_t matcher_;
    typedef detail::parser_t<matcher_t> parser_t;
-   parser_t parser_;
+   mutable parser_t parser_;
 
 public:
 
    node_set_t (const char * path, const string_t & body);
 
-   bool next ();
+   bool next () const;
    bool peek () const;
    node_t value () const;
 
@@ -1962,7 +1966,7 @@ public:
 // - if !next () - t is not written
 // - otherwise, value () >> t is called
 template<typename Target>
-node_set_t & operator>> (node_set_t & node_set, Target & t);
+const node_set_t & operator>> (const node_set_t & node_set, Target & t);
 
 class parser_t
 {
@@ -2146,7 +2150,7 @@ node_set_t::receiver_t::receive_match_end (const char * end)
 }
 
 inline bool 
-node_set_t::next ()
+node_set_t::next () const
 {
    receiver_.clear ();
    if (parser_.more ())
@@ -2433,7 +2437,7 @@ operator>> (const node_t & node, Target & t)
 
 template<class Container>
 inline const node_t & 
-operator>> (const node_t & node, detail::container_proxy_t<Container> & dest)
+operator>> (const node_t & node, detail::container_proxy_t<Container> dest)
 {
    if (node.body ().empty ())
       return node;
@@ -2526,7 +2530,7 @@ raw (Container & c)
 
 template<class Container>
 inline const node_t & 
-operator>> (const node_t & node, detail::cast_raw_t<Container> & r)
+operator>> (const node_t & node, detail::cast_raw_t<Container> r)
 {
    if (node.type () == node_type_array || node.type () == node_type_object)
       throw bad_conversion_error_t ();
@@ -2544,7 +2548,7 @@ body (Container & c)
 
 template<class Container>
 inline const node_t & 
-operator>> (const node_t & node, detail::cast_body_t<Container> & b)
+operator>> (const node_t & node, detail::cast_body_t<Container> b)
 {
    b.cont.assign (node.body ().data, node.body ().size);
    return node;   
@@ -2553,8 +2557,26 @@ operator>> (const node_t & node, detail::cast_body_t<Container> & b)
 // node_set conversion
 
 template<typename Target>
-inline node_set_t & 
-operator>> (node_set_t & node_set, Target & t)
+inline const node_set_t & 
+operator>> (const node_set_t & node_set, Target & t)
+{
+   if (node_set.next ())
+      node_set.value () >> t;
+   return node_set;
+}
+
+template<typename Container>
+inline const node_set_t & 
+operator>> (const node_set_t & node_set, detail::cast_raw_t<Container> t)
+{
+   if (node_set.next ())
+      node_set.value () >> t;
+   return node_set;
+}
+
+template<typename Container>
+inline const node_set_t & 
+operator>> (const node_set_t & node_set, detail::cast_body_t<Container> t)
 {
    if (node_set.next ())
       node_set.value () >> t;
