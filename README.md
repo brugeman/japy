@@ -19,8 +19,7 @@ For examples of use, see examples.cpp. Your feedback will be very much
 appreciated.
 
 I will soon make some optimizations, and maybe add some features, but
-the current public interface is unlikely to be changed. And, by the way,
-it does not decode escaped UTF sequences yet, that will also be added. 
+the current public interface is unlikely to be changed. 
 
 And here is what my 'json-path' language is:
 

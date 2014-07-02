@@ -481,6 +481,32 @@ namespace detail
       bool more () const;
    };
 
+   // supplementary classes to specialize operator>>
+
+   // raw bytes of attributes without decoding
+   template<class Container>
+   struct cast_raw_t
+   {
+      Container & cont;
+      cast_raw_t (Container & c) : cont (c) {}
+   };
+
+   // node's body bytes without any decodings
+   template<class Container>
+   struct cast_body_t
+   {
+      Container & cont;
+      cast_body_t (Container & c) : cont (c) {}
+   };
+
+   // proxy to make common specialized conversion for all containers
+   template<class Container>
+   struct container_proxy_t
+   {
+      Container & cont;
+      container_proxy_t (Container & c) : cont (c) {}
+   };
+
    // definitions
 
    // helper methods
@@ -1113,7 +1139,7 @@ namespace detail
       // FIXME these are ugly!
       auto is_integral = [] (const string_t & s)
 	 {
-	    // FIXME find a better way
+	    // FIXME find a better way and remove copying
 	    try
 	    {
 	       std::stoll (s);
@@ -1134,7 +1160,7 @@ namespace detail
 
       auto is_float = [] (const string_t & s)
 	 {
-	    // FIXME find a better way
+	    // FIXME find a better way and remove copying
 	    try
 	    {
 	       std::stold (s);
@@ -1761,6 +1787,29 @@ namespace detail
    }
    
 
+   template<class Container>
+   inline detail::container_proxy_t<Container> 
+   container_proxy (Container & c)
+   {
+      return detail::container_proxy_t<Container> (c);
+   }
+
+
+   // FIXME using std::string is not efficient 
+   // as we have our string_t as input and are forced to copy here
+   template<typename Numeric, typename Convertor>
+   inline Numeric 
+   convert_numeric (const std::string & s, Convertor conv)
+   {
+      typedef std::numeric_limits<Numeric> numeric;
+      // auto bcs Numeric may be narrower that conv returns
+      auto value = conv (s);
+      if (value > numeric::max () || value < numeric::min ())
+	 throw std::out_of_range ("Numeric value is out of range");
+
+      return static_cast<Numeric> (value);
+   }
+
 }; // namespace detail
 
 
@@ -1780,17 +1829,21 @@ public:
       : type_ (type), body_ (body)
    {}
 
+   node_type_t type () const { return type_; }
+   const string_t & body () const { return body_; }
+
    node_set_t operator[] (const char * path);
 
-   // conversions work as follows:
-   // - throw if (node_type == node_type_object || node_type == node_type_array)
-   // - if node body is empty - t is not written
-   // - node body is interpreted as Target 
-   // - if body may not represent target type - t is not written, no exceptions
-   // - if assignment to t fails (out of range, etc) - exception is thrown
-   template<typename Target>
-   friend const node_t & operator>> (const node_t & node, Target & t);
 };
+
+// conversions work as follows (and your custom ones should also):
+// - throw if (node_type == node_type_object || node_type == node_type_array)
+// - if node body is empty - t is not written
+// - node body is interpreted as Target 
+// - if body may not represent target type - t is not written, no exceptions
+// - if assignment to t fails (out of range, etc) - exception is thrown
+template<typename Target>
+const node_t & operator>> (const node_t & node, Target & t);
 
 // node iterator
 
@@ -1903,13 +1956,13 @@ public:
    {
       return japy::end (*this);
    }
-
-   // conversion works as follows:
-   // - if !next () - t is not written
-   // - otherwise, value () >> t is called
-   template<typename Target>
-   friend node_set_t & operator>> (node_set_t & node_set, Target & t);
 };
+
+// conversion works as follows:
+// - if !next () - t is not written
+// - otherwise, value () >> t is called
+template<typename Target>
+node_set_t & operator>> (node_set_t & node_set, Target & t);
 
 class parser_t
 {
@@ -1967,14 +2020,71 @@ public:
       return japy::end (*this);
    }
 
-   // conversion works as follows:
-   // - if !next () - t is not written
-   // - otherwise, 'value () >> t' is called
-   template<typename Target>
-   friend parser_t & operator>> (parser_t & parser, Target & t);
-
 };
 
+// conversion works as follows:
+// - if !next () - t is not written
+// - otherwise, 'value () >> t' is called
+template<typename Target>
+parser_t & operator>> (parser_t & parser, Target & t);
+
+// utf16 -> utf8 codepoint conversion
+// made public to be usable in your custom convertors
+
+class utf16_t
+{
+   static const size_t codepoint_len = 4;
+   static const size_t escape_len = 2;
+   static const size_t escaped_codepoint_len = codepoint_len + escape_len;
+
+   const char * str_;
+   const char * const end_;
+
+   utf16_t (const char * str, const char * const end)
+      : str_ (str), end_ (end)
+   {
+      assert (str_ < end_);
+   }
+
+   bool is_escaped () const
+   {
+      assert (tail_len () >= escape_len);
+      return *str_ == '\\' && *(str_ + 1) == 'u';
+   }
+
+   size_t tail_len () const
+   {
+      assert (str_ <= end_);
+      return end_ - str_;
+   }
+
+   bool is_codepoint () const;
+   long take_codepoint ();
+      
+   template<class Container>
+   const char * to_utf8 (Container & cont);
+
+public: 
+
+   template<class Container>
+   static const char *
+   to_utf8 (Container & c, const char * s, const char * const end)
+   {
+      return utf16_t (s, end).to_utf8 (c);
+   }
+
+   template<class Container>
+   static string_t
+   to_utf8 (Container & c, const string_t & s)
+   {
+      if (s.empty ()) return s;
+      const char * const end = s.data + s.size;
+      const char * str = utf16_t (s.data, end).to_utf8 (c);
+      assert (end >= str);
+      return string_t (str, end - str);
+   }
+
+};
 
 // definitions
 
@@ -2007,7 +2117,7 @@ node_set_t::receiver_t::receive_input_start (const char * start)
 inline void 
 node_set_t::receiver_t::receive_input_end (const char * end)
 {
-   assert (!body.data);
+   // noop
    (void)end;
 }
    
@@ -2179,22 +2289,107 @@ parser_t::value () const
 		  receiver_.body);
 }
 
-// conversions
-
-// FIXME using std::string is not efficient 
-// as we need our string_t
-template<typename Numeric, typename Convertor>
-inline Numeric 
-convert_numeric (const std::string & s, Convertor conv)
+// utf16_t
+inline long 
+utf16_t::take_codepoint ()
 {
-   typedef std::numeric_limits<Numeric> numeric;
-   // auto bcs Numeric may be narrower that conv returns
-   auto value = conv (s);
-   if (value > numeric::max () || value < numeric::min ())
-      throw std::out_of_range ("Numeric value is out of range");
+   if (tail_len () < codepoint_len)
+      throw bad_input_error_t ();
 
-   return static_cast<Numeric> (value);
+   char buffer[codepoint_len + 1] = {};
+   memcpy (buffer, str_, codepoint_len);
+
+   char * eptr = 0;
+   const long codepoint = strtol (buffer, &eptr, /* base= */16);
+   if ((eptr && *eptr) || codepoint < 0)
+      throw bad_input_error_t ();
+
+   str_ += codepoint_len;
+   assert (codepoint <= 0xFFFF);
+   return codepoint;
 }
+
+inline bool 
+utf16_t::is_codepoint () const
+{
+   if (tail_len () < escaped_codepoint_len)
+      return false;
+
+   if (!is_escaped ())
+      return false;
+
+   const char * s = str_ + escape_len;
+   for (size_t i = 0; s != end_ && i < codepoint_len; ++s, ++i)
+   {
+      if ((*s >= '0' && *s <= '9')
+	  || (*s >= 'a' && *s <= 'f')
+	  || (*s >= 'A' && *s <= 'F'))
+	 continue;
+
+      return false;
+   }
+
+   return true;
+}
+      
+template<class Container>
+inline const char * 
+utf16_t::to_utf8 (Container & cont)
+{
+   if (!is_codepoint ())
+      return str_;
+
+   str_ += escape_len;
+   long codepoint = take_codepoint (); // throws
+   const char * result = str_;
+
+   const bool is_lead = codepoint >= 0xD800 && codepoint <= 0xDBFF;
+   if (is_lead && is_codepoint ())
+   {
+      str_ += escape_len;
+      const long tail_codepoint = take_codepoint (); // throws
+      const bool is_tail = 
+	 tail_codepoint >= 0xDC00 && codepoint <= 0xDFFF;
+      if (is_tail)
+      {
+	 const long lead_10_bits = codepoint - 0xD800;
+	 const long tail_10_bits = tail_codepoint - 0xDC00;
+	 codepoint = 0x10000 + 
+	    ((lead_10_bits << 10) & 0xFFC00) +
+	    ((tail_10_bits) & 0x3FF);
+	 result = str_;
+      }
+   }
+
+   if (codepoint < 0x80)
+   {
+      cont.push_back (static_cast<char> (codepoint));
+   }
+   else if (codepoint < 0x0800)
+   {
+      cont.push_back (0xC0 + ((codepoint >> 6) & 0x1F));
+      cont.push_back (0x80 + (codepoint & 0x3F));
+   }
+   else if (codepoint < 0x10000)
+   {
+      cont.push_back (0xE0 + ((codepoint >> 12) & 0x0F));
+      cont.push_back (0x80 + ((codepoint >> 6) & 0x3F));
+      cont.push_back (0x80 + (codepoint & 0x3F));
+   }
+   else if (codepoint < 0x10FFFF)
+   {
+      cont.push_back (0xF0 + ((codepoint >> 18) & 0x07));
+      cont.push_back (0x80 + ((codepoint >> 12) & 0x3F));
+      cont.push_back (0x80 + ((codepoint >> 6) & 0x3F));
+      cont.push_back (0x80 + (codepoint & 0x3F));
+   }
+   else
+      throw bad_input_error_t ();
+
+   return result;
+}
+
+// conversions
 
 // works for numeric types only
 template<typename Target>
@@ -2205,10 +2400,10 @@ operator>> (const node_t & node, Target & t)
    static_assert (numeric::is_specialized, 
 		  "Only built-in numeric types are supported");
 
-   if (node.type_ == node_type_array || node.type_ == node_type_object)
+   if (node.type () == node_type_array || node.type () == node_type_object)
       throw bad_conversion_error_t ();
 
-   if (node.body_.empty ()) 
+   if (node.body ().empty ()) 
       return node;
    
    try
@@ -2216,16 +2411,16 @@ operator>> (const node_t & node, Target & t)
       // lambdas are here bcs stold have overloads
       // and are ambiguos for deduction of template parameter
       if (!numeric::is_integer)
-	 t = convert_numeric<Target> (
-	    node.body_,
+	 t = detail::convert_numeric<Target> (
+	    node.body (),
 	    [] (const std::string & s) { return std::stold (s);});
       else if (numeric::is_signed)
-	 t = convert_numeric<Target> (
-	    node.body_, 
+	 t = detail::convert_numeric<Target> (
+	    node.body (), 
 	    [] (const std::string & s) { return std::stoll (s);});
       else
-	 t = convert_numeric<Target> (
-	    node.body_, 
+	 t = detail::convert_numeric<Target> (
+	    node.body (), 
 	    [] (const std::string & s) { return std::stoull (s);});
    }
    catch (std::invalid_argument)
@@ -2234,17 +2429,128 @@ operator>> (const node_t & node, Target & t)
    return node;
 }
 
-// string specialization
-template<>
+// string and vector specializations
+
+template<class Container>
 inline const node_t & 
-operator>> <std::string> (const node_t & node, std::string & s)
+operator>> (const node_t & node, detail::container_proxy_t<Container> & dest)
 {
-   if (node.type_ == node_type_array || node.type_ == node_type_object)
+   if (node.body ().empty ())
+      return node;
+
+   // should be a value
+   if (node.type () == node_type_array || node.type () == node_type_object)
       throw bad_conversion_error_t ();
 
-   s.assign (node.body_.data, node.body_.size);
+   // non-strings may not contain encoded chars
+   if (node.type () != node_type_string)
+   {
+      dest.cont.assign (node.body ().data, 
+			node.body ().data + node.body ().size);
+      return node;
+   }
+
+   // decode escaped sequences
+
+   bool escaped = false;
+   const char * const end = node.body ().data + node.body ().size;
+   for (const char * c = node.body ().data; 
+	c != end;)
+   {
+      if (escaped)
+      {
+	 const char e = *c++;
+	 switch (e)
+	 {
+	    case 'b': dest.cont.push_back ('\b'); break;
+	    case 'f': dest.cont.push_back ('\f'); break;
+	    case 'n': dest.cont.push_back ('\n'); break;
+	    case 'r': dest.cont.push_back ('\r'); break;
+	    case 't': dest.cont.push_back ('\t'); break;
+
+	    default:
+	       // default is to simply append escaped char
+	       dest.cont.push_back (e);
+	 }
+	 escaped = false;
+	 continue;
+      }
+
+      const char * next = utf16_t::to_utf8 (dest.cont, c, end); // throws
+      assert (next >= c && next <= end);
+      if (next > c)
+      {
+	 c = next;
+      }
+      else if (*c != '\\')
+      {
+	 dest.cont.push_back (*c);
+	 ++c;
+      }
+      else
+      {
+	 assert (*c == '\\');
+	 escaped = true;
+	 ++c;
+      }
+   }
+
    return node;
 }
+
+inline const node_t & 
+operator>> (const node_t & node, std::string & s)
+{
+   return node >> detail::container_proxy (s);
+}
+
+inline const node_t & 
+operator>> (const node_t & node, std::vector<char> & s)
+{
+   return node >> detail::container_proxy (s);
+}
+
+inline const node_t & 
+operator>> (const node_t & node, std::deque<char> & s)
+{
+   return node >> detail::container_proxy (s);
+}
+
+// custom conversions
+template<class Container>
+inline detail::cast_raw_t<Container> 
+raw (Container & c)
+{
+   return detail::cast_raw_t<Container> (c);
+}
+
+template<class Container>
+inline const node_t & 
+operator>> (const node_t & node, detail::cast_raw_t<Container> & r)
+{
+   if (node.type () == node_type_array || node.type () == node_type_object)
+      throw bad_conversion_error_t ();
+
+   r.cont.assign (node.body ().data, node.body ().size);
+   return node;   
+}
+
+template<class Container>
+inline detail::cast_body_t<Container> 
+body (Container & c)
+{
+   return detail::cast_body_t<Container> (c);
+}
+
+template<class Container>
+inline const node_t & 
+operator>> (const node_t & node, detail::cast_body_t<Container> & b)
+{
+   b.cont.assign (node.body ().data, node.body ().size);
+   return node;   
+}
+
+// node_set conversion
 
 template<typename Target>
 inline node_set_t & 
@@ -2254,6 +2560,8 @@ operator>> (node_set_t & node_set, Target & t)
       node_set.value () >> t;
    return node_set;
 }
+
+// parser conversion
 
 template<typename Target>
 inline parser_t & 

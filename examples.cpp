@@ -30,6 +30,19 @@ SOFTWARE.
 
 #include "japy.hpp"
 
+struct hello_t
+{
+   std::string str;
+};
+
+static const japy::node_t &
+operator>> (const japy::node_t & node, hello_t & hello)
+{
+   hello.str = "hello ";
+   hello.str += node.body ();
+   return node;
+}
+
 static void
 test1 ()
 {
@@ -99,6 +112,27 @@ test1 ()
    // note that both 8 and 88 are a match, but >> extracts only the first one
    assert (i == 8);
 
+   // now, escaped sequences decoding
+   std::string s;
+   japy::parse ("{\"a\":\"\\n\\u20AC\\uD834\\uDD1E\\ud834ab\\c\"}", "/a") >> s;
+   assert (s == "\n\xE2\x82\xAC\xF0\x9D\x84\x9E\xED\xA0\xB4""abc");
+
+   // now, do not decode the value, get the raw bytes
+   std::string raw;
+   japy::parse ("{\"a\":\"\\n\\u20AC\"}", "/a") >> japy::raw (raw);
+   assert (raw == "\\n\\u20AC");
+
+   // now, get the full body of an object as a string
+   std::string body;
+   const char * json = "{\"a\":\"\\n\\u20AC\"}";
+   japy::parse (json, "$") >> japy::body (body);
+   assert (body == json);
+
+   // now, our custom object and overloaded >> (see above)
+   hello_t hello;
+   japy::parse ("[\"world\"]", "/*") >> hello;
+   assert (hello.str == "hello world");
+
    // that's pretty it
    printf ("test1 done\n");
 }
@@ -118,6 +152,16 @@ test2 ()
       object["/a"] >> v;
       sum += v;
    }
+   assert (sum == 3);
+
+   // or one by one extraction of nodes
+   sum = 0;
+   auto node_set = japy::parse ("[{\"a\":1}, {\"a\":2}]", "#/$/a");
+   int v1 = 0;
+   int v2 = 0;
+   node_set >> v1 
+	    >> v2;
+   sum += v1 + v2;
    assert (sum == 3);
 
    // a bit more complex document
