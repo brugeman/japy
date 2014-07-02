@@ -43,7 +43,6 @@ operator>> (const japy::node_t & node, hello_t & hello)
    return node;
 }
 
-
 static void
 test1 ()
 {

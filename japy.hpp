@@ -1008,7 +1008,7 @@ namespace detail
    inline bool 
    matcher_t<Receiver>::container_end (const char * end)
    {
-      assert (*end);
+      assert (end && *end);
       assert (cursor <= size ());
       assert (depth >= cursor_depth);
 
@@ -1806,7 +1806,7 @@ namespace detail
    convert_numeric (const std::string & s, Convertor conv)
    {
       typedef std::numeric_limits<Numeric> numeric;
-      // auto bcs Numeric may be narrower that conv returns
+      // auto bcs Numeric may be narrower what conv returns
       auto value = conv (s);
       if (value > numeric::max () || value < numeric::min ())
 	 throw std::out_of_range ("Numeric value is out of range");
@@ -2190,7 +2190,7 @@ parser_t::receiver_t::receive_input_start (const char * start)
 inline void 
 parser_t::receiver_t::receive_input_end (const char * end)
 {
-   assert (end && !*end);
+   assert (end);
 
    if (!body.data)
       return;
