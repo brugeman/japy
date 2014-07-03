@@ -3,6 +3,7 @@
 JAPY is a new JSON parser in C++.
 
 This file contains examples of JAPY in action. 
+For description of japy path language see README.
 
 The MIT License (MIT)
 
@@ -52,8 +53,8 @@ test1 ()
    int i = 0;
 
    // JAPY uses 'paths' to address parts of json documents
-   // '/a' path refers to 'child members named a'
-   japy::parse ("{\"a\":1}", "/a") >> i;
+   // 'a' path refers to 'child members named a'
+   japy::parse ("{\"a\":1}", "a") >> i;
    assert (i == 1);
 
    // how about a more complex document?
@@ -66,7 +67,7 @@ test1 ()
    try
    {
       // exception is thrown if we don't find a match
-      japy::parse ("{\"a\":3}", "/b") >> i;
+      japy::parse ("{\"a\":3}", "b") >> i;
       assert (0);
    }
    catch (...)
@@ -75,14 +76,14 @@ test1 ()
    // what if we want a default value to be used instead of exception?
    i = -1; // default
    // ? in path means 'optional', if no match - i is not written
-   japy::parse ("{\"a\":4}", "/?b") >> i;
+   japy::parse ("{\"a\":4}", "?b") >> i;
    assert (i == -1);
 
    // what if matched value is out of range of our numeric variable?
    try
    {
       // out_of_range exception is thrown (if your ints are 32 bit, of course)
-      japy::parse ("{\"a\":5555555555}", "/a") >> i;
+      japy::parse ("{\"a\":5555555555}", "a") >> i;
       assert (0);
 
       // what if we don't want an out_of_range exception thrown here?
@@ -95,42 +96,43 @@ test1 ()
    {}
 
    // how about an even more complex document?
-   // '#/$/a' refers to "root array's child objects' members named a"
-   japy::parse ("[{\"a\":6}]", "#/$/a") >> i;
+   // '/#/$/a' refers to "root array's child objects' members named a"
+   // notice how leading '/' makes first selector match agains root, not children
+   japy::parse ("[{\"a\":6}]", "/#/$/a") >> i;
    assert (i == 6);
 
    // what if we want to make sure the selected value is of integral type?
    // 'i:' in path means 'node type - integral'
-   japy::parse ("{\"a\":7}", "/i:a") >> i;
+   japy::parse ("{\"a\":7}", "i:a") >> i;
    assert (i == 7);   
-   japy::parse ("{\"a\":\"77\"}", "/?i:a") >> i;
+   japy::parse ("{\"a\":\"77\"}", "?i:a") >> i;
    assert (i == 7);
 
    // ok, one more thing
    // '/#a/*' refers to 'elements of child array named a'
-   japy::parse ("{\"a\":[8, 88]}", "/#a/*") >> i;
+   japy::parse ("{\"a\":[8, 88]}", "#a/*") >> i;
    // note that both 8 and 88 are a match, but >> extracts only the first one
    assert (i == 8);
 
    // now, escaped sequences decoding
    std::string s;
-   japy::parse ("{\"a\":\"\\n\\u20AC\\uD834\\uDD1E\\ud834ab\\c\"}", "/a") >> s;
+   japy::parse ("{\"a\":\"\\n\\u20AC\\uD834\\uDD1E\\ud834ab\\c\"}", "a") >> s;
    assert (s == "\n\xE2\x82\xAC\xF0\x9D\x84\x9E\xED\xA0\xB4""abc");
 
    // now, do not decode the value, get the raw bytes
    std::string raw;
-   japy::parse ("{\"a\":\"\\n\\u20AC\"}", "/a") >> japy::raw (raw);
+   japy::parse ("{\"a\":\"\\n\\u20AC\"}", "a") >> japy::raw (raw);
    assert (raw == "\\n\\u20AC");
 
    // now, get the full body of an object as a string
    std::string body;
    const char * json = "{\"a\":\"\\n\\u20AC\"}";
-   japy::parse (json, "$") >> japy::body (body);
+   japy::parse (json, "/$") >> japy::body (body);
    assert (body == json);
 
    // now, our custom object and overloaded >> (see above)
    hello_t hello;
-   japy::parse ("[\"world\"]", "/*") >> hello;
+   japy::parse ("[\"world\"]", "*") >> hello;
    assert (hello.str == "hello world");
 
    // that's pretty it
@@ -144,19 +146,19 @@ test2 ()
 
    // easy!
    int sum = 0;
-   // #/$ means 'object elements of array root'
-   for (auto object: japy::parse ("[{\"a\":1}, {\"a\":2}]", "#/$"))
+   // /#/$ means 'object elements of array root'
+   for (auto object: japy::parse ("[{\"a\":1}, {\"a\":2}]", "/#/$"))
    {
       int v = 0;
       // see the sub-query - '/a' works on the pre-selected object
-      object["/a"] >> v;
+      object["a"] >> v;
       sum += v;
    }
    assert (sum == 3);
 
    // or one by one extraction of nodes
    sum = 0;
-   auto node_set (japy::parse ("[{\"a\":1}, {\"a\":2}]", "#/$/a"));
+   auto node_set (japy::parse ("[{\"a\":1}, {\"a\":2}]", "$/a"));
    int v1 = 0;
    int v2 = 0;
    node_set >> v1 
@@ -211,10 +213,11 @@ test2 ()
    assert (sum == 1);
 
    // how about sub-iterating?
+   // # only selects the child array, and skips the object 
    sum = 0;
-   for (auto arr: japy::parse ("[{\"a\":1}, [2, 3]]", "/#"))
+   for (auto arr: japy::parse ("[{\"a\":1}, [2, 3]]", "#"))
    {
-      for (auto element: arr["/*"])
+      for (auto element: arr["*"])
       {
 	 int v = 0;
 	 element >> v;
@@ -243,7 +246,7 @@ test3 ()
    // create a parser, specify a 'scope-path'
    // objects referred by scope-path are buffered internally 
    // (if seen on the parts' borders)
-   japy::parser_t parser ("/*");
+   japy::parser_t parser ("*");
 
    // feed a part of your json into parser
    parser.put (part1);
@@ -292,7 +295,7 @@ test3 ()
    std::string stream ("[11, 22, 33]");
 
    // 2. Parser with a proper scope
-   japy::parser_t parser ("/*");
+   japy::parser_t parser ("*");
    for (auto part: stream)
    {
       // 3. Feed part to the parser
@@ -318,7 +321,7 @@ test3 ()
    // however, sometimes you have streams of json documents, 
    // each having a root. use 'allow_many_roots' option for that case:
    int sum = 0;
-   japy::parser_t parser ("/a");
+   japy::parser_t parser ("a");
    parser.allow_many_roots (true);
    parser.put ("{\"a\":1} {\"a\":2}"); // two json docs in one stream
    for (auto node: parser)

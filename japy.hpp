@@ -813,10 +813,16 @@ namespace detail
    path_t::parse_selectors ()
    {
       const char * str = path.c_str ();
-      if (*str == '/')
+      skip_spaces (str);
+
+      if (*str != '/')
       {
-	 // special case - empty root selector
+	 // default case - empty root selector
 	 add ();
+      }
+      else
+      {
+	 // skip root marker '/' and add root selector
 	 ++str;
       }
 
@@ -1788,8 +1794,7 @@ namespace detail
    make_parser (Visitor & visitor)
    {
       return parser_t<Visitor> (visitor);
-   }
-   
+   }   
 
    template<class Container>
    inline detail::container_proxy_t<Container> 
@@ -1797,7 +1802,6 @@ namespace detail
    {
       return detail::container_proxy_t<Container> (c);
    }
-
 
    // FIXME using std::string is not efficient 
    // as we have our string_t as input and are forced to copy here
