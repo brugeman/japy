@@ -21,7 +21,7 @@ appreciated.
 And here is what japy path language is:
 
 example: 
-<code>array:/object:/array:some_name//!array:/?integral:another_name</code>
+<code>array:/object:/array:some_name//!array:/?integral:another_name</code>  
 abbreviated:
 <code>#/$/#some_name//!#/?i:another_name</code>
 
