@@ -150,7 +150,7 @@ test2 ()
    for (auto object: japy::parse ("[{\"a\":1}, {\"a\":2}]", "/#/$"))
    {
       int v = 0;
-      // see the sub-query - '/a' works on the pre-selected object
+      // see the sub-query - 'a' works on the pre-selected object
       object["a"] >> v;
       sum += v;
    }

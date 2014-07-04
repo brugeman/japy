@@ -423,9 +423,9 @@ namespace detail
       static const size_t value_min_buffer_size = 64;
       buffer_t<value_min_buffer_size> value_buffer_;
 
+      static bool stack_object () { return true; }
+      static bool stack_array () { return false; }
       typedef std::stack<bool, std::vector<bool> > state_stack_t;
-      static const bool stack_object = true;
-      static const bool stack_array = false;
       state_stack_t stack_; 
 
       typedef void (parser_t::*state_handler_t) ();
@@ -654,7 +654,7 @@ namespace detail
       {
 	 if (!escape && *s == '"')
 	    break;
-	 escape = !escape && *s == '\\';
+	 escape ^= *s == '\\';
       }
       if (*s != '"')
 	 throw bad_name_error_t ();
@@ -1286,7 +1286,7 @@ namespace detail
    parser_t<Visitor>::is_object () const 
    { 
       assert (!stack_.empty ()); 
-      return stack_.top () == stack_object; 
+      return stack_.top () == stack_object (); 
    }
 
    template<class Visitor>
@@ -1344,7 +1344,7 @@ namespace detail
       assert (more () && *input_ == '{');
 
       state_handler_ = &parser_t::process_body;
-      stack_.push (stack_object);
+      stack_.push (stack_object ());
       visitor_.visit_object_start (input_);
 
       ++input_;
@@ -1358,7 +1358,7 @@ namespace detail
       assert (more () && *input_ == '[');
 
       state_handler_ = &parser_t::process_body;
-      stack_.push (stack_array);
+      stack_.push (stack_array ());
       visitor_.visit_array_start (input_);
 
       ++input_;
@@ -1459,19 +1459,11 @@ namespace detail
 	 assert (!current_value_.size);
       }
 
-      auto quoted_end = [this] (const char c)
-	 {
-	    return c == '"' && !this->escape_; 
-	 };
-
-      auto update_escape = [this] (const char c)
-	 {
-	    this->escape_ = !this->escape_ && c == '\\';
-	 };
-
       const char * from = input_;
-      for (; more () && !quoted_end (*input_); ++input_)
-	 update_escape (*input_);
+      bool quoted_end = false;
+      for (; more () && !(quoted_end = *input_ == '"' && !escape_); 
+	   ++input_)
+	 escape_ ^= *input_ == '\\';
 
       const size_t dist = input_ - from;
       if (dist && value_buffer_.buffered_data (current_value_.data))
@@ -1482,7 +1474,7 @@ namespace detail
       }
       current_value_.size += dist;  
 
-      if (quoted_end (*input_))
+      if (quoted_end)
       {
 	 if (member)
 	 {
@@ -1587,17 +1579,23 @@ namespace detail
       switch (*input_)
       {
 	 case '}':
+	    if (current_value_.empty ())
+	       throw bad_input_error_t ();
+
 	    end_of_step_ = visitor_.visit_value (current_value_);
 	    current_value_.clear ();
-
-	    object_end ();
+	    state_handler_ = &parser_t::process_body;
+	    // don't eat the }, process_body will use it
 	    break;
 
 	 case ']':
+	    if (current_value_.empty ())
+	       throw bad_input_error_t ();
+
 	    end_of_step_ = visitor_.visit_value (current_value_);
 	    current_value_.clear ();
-
-	    array_end ();
+	    state_handler_ = &parser_t::process_body;
+	    // don't eat the ], process_body will use it
 	    break;
 
 	 case ',':
