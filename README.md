@@ -47,4 +47,6 @@ Absence of leading <code>/</code> means that first selector is matched against c
 
 That's it. Take a look at examples.cpp to see how it works.
 
+UP: I have recently discovered a node.js module <a href="https://www.npmjs.org/package/JSONStream">JSONStream</a> built on pretty much the same principles as Japy. If you care, of course.
+
 Copyright © 2014, Artur Brugeman, brugeman.artur@gmail.com.
